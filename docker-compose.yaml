@@ -1,0 +1,79 @@
+version: '3'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: apteka_frontend
+    command: serve -s  build -l 3000
+    restart: unless-stopped
+    networks:
+      - my_network
+
+  api:
+    build: ./api
+    container_name: apteka_api
+    restart: unless-stopped
+    command: npm run start
+    environment:
+      - PORT=3001
+      #- HOST=http://docker-example.com
+      - MONGO_URL=mongodb://api_db:27017/api
+      - AUTH_API_URL=http://auth:3002/api
+    depends_on:
+      - api_db
+    networks:
+      - my_network
+
+  auth:
+    build: ./auth
+    container_name: apteka_auth
+    restart: unless-stopped
+    command: npm run start
+    environment:
+      - PORT=3002
+      - MONGO_URL=mongodb://auth_db:27017/auth
+      - API_URL=http://api:3001/api
+    depends_on:
+      - auth_db
+    networks:
+      - my_network
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: apteak_nginx
+    ports:
+    - "80:80"
+    volumes:
+    - ./nginx/nginx.conf.prod:/etc/nginx/conf.d/nginx.conf
+    depends_on:
+      - frontend
+      - api
+      - auth
+    networks:
+      - my_network
+
+  api_db:
+    image: mongo:latest
+    container_name: apteka_api_db
+    volumes:
+      - mongodb_api:/data/db
+    networks:
+      - my_network
+
+  auth_db:
+    image: mongo:latest
+    container_name: apteka_auth_db
+    volumes:
+      - mongodb_auth:/data/db
+    networks:
+      - my_network
+
+volumes:
+  mongodb_api:
+  mongodb_auth:
+
+networks:
+  my_network:
+    driver: bridge
